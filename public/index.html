@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CV Optimizer Agent</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Top navigation bar -->
+  <nav class="top-bar">
+    <div class="top-bar-left">
+      <span class="logo">CV Optimizer</span>
+    </div>
+    <div class="top-bar-right">
+      <button id="history-btn" class="btn-icon" title="Conversation history">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12,6 12,12 16,14"/>
+        </svg>
+      </button>
+      <button id="new-btn" class="btn-secondary">+ New CV</button>
+    </div>
+  </nav>
+
+  <!-- VIEW 1: Upload Form -->
+  <div id="view-upload" class="view active">
+    <div class="container">
+      <header>
+        <h1>Optimize Your Resume</h1>
+        <p class="subtitle">Upload your resume and get an AI-optimized CV tailored to any job</p>
+      </header>
+
+      <form id="analyze-form">
+        <div class="form-group">
+          <label for="resume">Resume (PDF)</label>
+          <div class="file-upload" id="file-upload-area">
+            <input type="file" id="resume" name="resume" accept=".pdf" required>
+            <span class="file-label" id="file-label">Click or drag to upload PDF</span>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="jobPosition">Job Position</label>
+            <input type="text" id="jobPosition" name="jobPosition" placeholder="e.g. Senior Frontend Developer" required>
+          </div>
+          <div class="form-group">
+            <label for="company">Company</label>
+            <input type="text" id="company" name="company" placeholder="e.g. Google" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="jobDescription">Job Description</label>
+          <textarea id="jobDescription" name="jobDescription" rows="8" placeholder="Paste the full job description here..." required></textarea>
+        </div>
+
+        <button type="submit" id="submit-btn">
+          <span class="btn-text">Analyze</span>
+          <span class="spinner hidden"></span>
+        </button>
+      </form>
+
+      <div id="error" class="error hidden"></div>
+    </div>
+  </div>
+
+  <!-- VIEW 2: Conversation (side-by-side) -->
+  <div id="view-conversation" class="view">
+    <div class="split-layout">
+      <!-- Left: Chat panel -->
+      <div class="chat-panel">
+        <div class="chat-header">
+          <button id="back-btn" class="btn-icon" title="Back to upload">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15,18 9,12 15,6"/>
+            </svg>
+          </button>
+          <div class="chat-header-info">
+            <span id="chat-position" class="chat-position"></span>
+            <span id="chat-company" class="chat-company"></span>
+          </div>
+          <button id="download-btn" class="btn-primary btn-sm">Download PDF</button>
+        </div>
+
+        <div id="chat-messages" class="chat-messages"></div>
+
+        <div class="chat-input-area">
+          <textarea id="chat-input" placeholder="Ask for changes... e.g. 'make summary shorter'" rows="2"></textarea>
+          <button id="chat-send-btn" class="btn-primary">
+            <span class="btn-text">Send</span>
+            <span class="spinner hidden"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right: PDF Preview -->
+      <div class="preview-panel">
+        <div class="preview-header">
+          <span>Live Preview</span>
+          <button id="preview-download-btn" class="btn-secondary btn-sm">Download</button>
+        </div>
+        <div class="pdf-preview-container">
+          <iframe id="pdf-preview" class="pdf-preview-iframe"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- History overlay -->
+  <div id="history-overlay" class="overlay hidden">
+    <div class="history-panel">
+      <div class="history-header">
+        <h3>Past Conversations</h3>
+        <button id="history-close-btn" class="btn-icon">&times;</button>
+      </div>
+      <div id="history-list" class="history-list"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
