@@ -2,10 +2,12 @@ const express = require("express");
 const multer = require("multer");
 const pdfParse = require("pdf-parse");
 const Anthropic = require("@anthropic-ai/sdk");
+const Groq = require("groq-sdk");
 const puppeteer = require("puppeteer");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
+const { log } = require("console");
 require("dotenv").config();
 
 const CONVERSATIONS_DIR = path.join(__dirname, "conversations");
@@ -35,9 +37,57 @@ const upload = multer({
   },
 });
 
-const anthropic = new Anthropic.default({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+const AI_PROVIDER = (process.env.AI_PROVIDER || "anthropic").toLowerCase();
+
+const anthropic = AI_PROVIDER === "anthropic"
+  ? new Anthropic.default({ apiKey: process.env.ANTHROPIC_API_KEY })
+  : null;
+
+const groq = AI_PROVIDER === "groq"
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY })
+  : null;
+
+console.log(`AI Provider: ${AI_PROVIDER}`);
+
+/**
+ * Unified chat completion that works with both Anthropic and Groq.
+ * @param {object} opts
+ * @param {string} [opts.system] - System prompt (optional)
+ * @param {Array} opts.messages - Array of {role, content} messages
+ * @param {number} [opts.maxTokens=4096] - Max tokens
+ * @returns {Promise<string>} The assistant's response text
+ */
+async function chatCompletion({ system, messages, maxTokens = 4096 }) {
+  if (AI_PROVIDER === "groq") {
+    const groqMessages = [];
+    if (system) {
+      groqMessages.push({ role: "system", content: system });
+    }
+    groqMessages.push(...messages);
+
+    const response = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      max_tokens: maxTokens,
+      messages: groqMessages,
+    });
+    console.log("tokens used:", response.usage);
+    return response.choices[0].message.content;
+  }
+
+  // Default: Anthropic
+  const params = {
+    model: "claude-sonnet-4-20250514",
+    max_tokens: maxTokens,
+    messages,
+  };
+  if (system) {
+    params.system = system;
+  }
+  const response = await anthropic.messages.create(params);
+    console.log("tokens used:", response.usage);
+  return response.content[0].text;
+}
+
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(__dirname, "public")));
@@ -60,7 +110,7 @@ function savePreference(rule, sourceConversationId) {
   const prefs = loadPreferences();
   // Avoid duplicates (simple substring check)
   const isDuplicate = prefs.some(
-    (p) => p.rule.toLowerCase() === rule.toLowerCase()
+    (p) => p.rule.toLowerCase() === rule.toLowerCase(),
   );
   if (isDuplicate) return;
   prefs.push({
@@ -71,7 +121,7 @@ function savePreference(rule, sourceConversationId) {
   fs.writeFileSync(
     MEMORY_PATH,
     JSON.stringify({ preferences: prefs }, null, 2),
-    "utf8"
+    "utf8",
   );
   console.log("New preference saved:", rule);
 }
@@ -90,9 +140,8 @@ async function extractPreferenceInBackground(userMessage, conversationId) {
     const existing = loadPreferences();
     const existingRules = existing.map((p) => p.rule).join("\n");
 
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 200,
+    const result = (await chatCompletion({
+      maxTokens: 200,
       messages: [
         {
           role: "user",
@@ -110,9 +159,7 @@ If this IS a reusable preference, respond with ONLY the rule as a concise instru
 If this is NOT a reusable preference, respond with exactly: NONE`,
         },
       ],
-    });
-
-    const result = response.content[0].text.trim();
+    })).trim();
     if (result !== "NONE" && result.length > 5 && result.length < 200) {
       savePreference(result, conversationId);
     }
@@ -198,7 +245,9 @@ app.post("/api/analyze", upload.single("resume"), async (req, res) => {
     if (!jobPosition || !company || !jobDescription) {
       return res
         .status(400)
-        .json({ error: "Job position, company, and job description are required" });
+        .json({
+          error: "Job position, company, and job description are required",
+        });
     }
 
     console.log("Parsing PDF...");
@@ -208,15 +257,14 @@ app.post("/api/analyze", upload.single("resume"), async (req, res) => {
 
     if (!resumeText.trim()) {
       return res.status(400).json({
-        error: "Could not extract text from the PDF. Make sure it is not scanned/image-based.",
+        error:
+          "Could not extract text from the PDF. Make sure it is not scanned/image-based.",
       });
     }
 
-    console.log("Calling Claude API...");
+    console.log("Calling AI API...");
     const prefsBlock = getPreferencesBlock();
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4096,
+    const fullResponse = await chatCompletion({
       messages: [
         {
           role: "user",
@@ -249,8 +297,7 @@ ${resumeText}`,
       ],
     });
 
-    console.log("Claude API responded successfully");
-    const fullResponse = message.content[0].text;
+    console.log("AI API responded successfully");
 
     // Parse response into explanation + HTML
     let explanation = "";
@@ -258,7 +305,9 @@ ${resumeText}`,
     const separatorIndex = fullResponse.indexOf("---HTML_START---");
     if (separatorIndex !== -1) {
       explanation = fullResponse.slice(0, separatorIndex).trim();
-      htmlContent = fullResponse.slice(separatorIndex + "---HTML_START---".length).trim();
+      htmlContent = fullResponse
+        .slice(separatorIndex + "---HTML_START---".length)
+        .trim();
     } else {
       htmlContent = extractHtmlFromResponse(fullResponse) || fullResponse;
       explanation = "Your CV has been optimized for the target position.";
@@ -319,12 +368,14 @@ app.get("/api/conversations", async (req, res) => {
     if (!fs.existsSync(CONVERSATIONS_DIR)) {
       return res.json([]);
     }
-    const files = fs.readdirSync(CONVERSATIONS_DIR).filter((f) => f.endsWith(".json"));
+    const files = fs
+      .readdirSync(CONVERSATIONS_DIR)
+      .filter((f) => f.endsWith(".json"));
     const conversations = files
       .map((f) => {
         try {
           const data = JSON.parse(
-            fs.readFileSync(path.join(CONVERSATIONS_DIR, f), "utf8")
+            fs.readFileSync(path.join(CONVERSATIONS_DIR, f), "utf8"),
           );
           return {
             id: data.id,
@@ -388,7 +439,9 @@ app.post("/api/conversations/:id/message", async (req, res) => {
       return res.status(400).json({ error: "Message is required" });
     }
 
-    console.log(`Refinement for ${conversation.id}: "${message.trim().slice(0, 80)}..."`);
+    console.log(
+      `Refinement for ${conversation.id}: "${message.trim().slice(0, 80)}..."`,
+    );
 
     // Build messages with sliding window history
     const prefsBlock = getPreferencesBlock();
@@ -419,7 +472,10 @@ RULES:
     if (conversation.messages.length >= 2) {
       messages.push({
         role: "assistant",
-        content: conversation.messages[1].content + "\n\n---HTML_START---\n\n" + conversation.currentHtml,
+        content:
+          conversation.messages[1].content +
+          "\n\n---HTML_START---\n\n" +
+          conversation.currentHtml,
       });
     }
 
@@ -428,7 +484,10 @@ RULES:
     const historyPairs = [];
     for (let i = 2; i < conversation.messages.length; i += 2) {
       if (conversation.messages[i] && conversation.messages[i + 1]) {
-        historyPairs.push([conversation.messages[i], conversation.messages[i + 1]]);
+        historyPairs.push([
+          conversation.messages[i],
+          conversation.messages[i + 1],
+        ]);
       }
     }
     const recentPairs = historyPairs.slice(-MAX_HISTORY_PAIRS);
@@ -443,15 +502,11 @@ RULES:
       content: `Current CV HTML:\n${conversation.currentHtml}\n\nPlease make the following change: ${message.trim()}`,
     });
 
-    console.log("Calling Claude API for refinement...");
-    const claudeResponse = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4096,
+    console.log("Calling AI API for refinement...");
+    const fullResponse = await chatCompletion({
       system: systemPrompt,
       messages,
     });
-
-    const fullResponse = claudeResponse.content[0].text;
 
     let explanation = "";
     let htmlContent = "";
@@ -460,19 +515,25 @@ RULES:
     const separatorIndex = fullResponse.indexOf("---HTML_START---");
     if (separatorIndex !== -1) {
       explanation = fullResponse.slice(0, separatorIndex).trim();
-      let rest = fullResponse.slice(separatorIndex + "---HTML_START---".length).trim();
+      let rest = fullResponse
+        .slice(separatorIndex + "---HTML_START---".length)
+        .trim();
 
       // Check for preference marker
       const prefIndex = rest.indexOf("---PREFERENCE---");
       if (prefIndex !== -1) {
         htmlContent = rest.slice(0, prefIndex).trim();
-        preferenceRule = rest.slice(prefIndex + "---PREFERENCE---".length).trim();
+        preferenceRule = rest
+          .slice(prefIndex + "---PREFERENCE---".length)
+          .trim();
       } else {
         htmlContent = rest;
       }
     } else {
-      htmlContent = extractHtmlFromResponse(fullResponse) || conversation.currentHtml;
-      explanation = fullResponse.replace(htmlContent, "").trim() || "Changes applied.";
+      htmlContent =
+        extractHtmlFromResponse(fullResponse) || conversation.currentHtml;
+      explanation =
+        fullResponse.replace(htmlContent, "").trim() || "Changes applied.";
     }
 
     // Save learned preference if one was extracted from the response
