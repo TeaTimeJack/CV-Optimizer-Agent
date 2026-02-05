@@ -1,12 +1,13 @@
 # 📄 CV Optimizer Agent
 
-An AI-powered resume optimization tool that tailors your CV to any job description — powered by **Claude AI**. Upload your PDF resume, paste the job details, and get a professionally optimized, single-page A4 PDF in seconds.
+An AI-powered resume optimization tool that tailors your CV to any job description — powered by **Claude AI** or **Groq (Llama 3.3)**. Upload your PDF resume, paste the job details, and get a professionally optimized, single-page A4 PDF in seconds.
 
 > 🔒 **Privacy first:** The optimizer never invents skills or experiences. It only rewrites, reorders, and emphasizes what's already in your resume.
 
 ![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)
 ![Claude AI](https://img.shields.io/badge/Claude_AI-Sonnet_4-6B4FBB?logo=anthropic&logoColor=white)
+![Groq](https://img.shields.io/badge/Groq-Llama_3.3_70B-F55036?logo=groq&logoColor=white)
 ![License](https://img.shields.io/badge/License-ISC-blue)
 
 ---
@@ -49,7 +50,7 @@ An AI-powered resume optimization tool that tailors your CV to any job descripti
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) v18 or higher
-- An [Anthropic API key](https://console.anthropic.com/)
+- An [Anthropic API key](https://console.anthropic.com/) **or** a [Groq API key](https://console.groq.com/)
 
 ### Installation
 
@@ -66,9 +67,18 @@ An AI-powered resume optimization tool that tailors your CV to any job descripti
 
 3. **Set up environment variables**
 
-   Create a `.env` file in the project root:
+   Create a `.env` file in the project root. You can choose between **Anthropic (Claude)** or **Groq (Llama 3.3)** as your AI provider:
+
+   **Option A — Anthropic (default):**
    ```env
-   ANTHROPIC_API_KEY=your_api_key_here
+   AI_PROVIDER=anthropic
+   ANTHROPIC_API_KEY=your_anthropic_api_key_here
+   ```
+
+   **Option B — Groq:**
+   ```env
+   AI_PROVIDER=groq
+   GROQ_API_KEY=your_groq_api_key_here
    ```
 
 4. **Start the server**
@@ -85,16 +95,16 @@ An AI-powered resume optimization tool that tailors your CV to any job descripti
 ## 🔧 How It Works
 
 ```
-┌──────────┐     ┌──────────────┐     ┌───────────┐     ┌───────────┐     ┌──────────┐
-│  Upload  │────▶│  pdf-parse   │────▶│ Claude AI │────▶│ Puppeteer │────▶│ Download │
-│  PDF     │     │  Extract     │     │ Optimize  │     │ HTML→PDF  │     │  PDF     │
-│          │     │  Text        │     │ Content   │     │           │     │          │
-└──────────┘     └──────────────┘     └───────────┘     └───────────┘     └──────────┘
+┌──────────┐     ┌──────────────┐     ┌─────────────────┐     ┌───────────┐     ┌──────────┐
+│  Upload  │────▶│  pdf-parse   │────▶│ Claude / Groq   │────▶│ Puppeteer │────▶│ Download │
+│  PDF     │     │  Extract     │     │ Optimize        │     │ HTML→PDF  │     │  PDF     │
+│          │     │  Text        │     │ Content         │     │           │     │          │
+└──────────┘     └──────────────┘     └─────────────────┘     └───────────┘     └──────────┘
 ```
 
 1. **Upload** — You upload your PDF resume along with the target job position, company, and description
 2. **Extract** — `pdf-parse` extracts the text content from your PDF
-3. **Optimize** — Claude AI analyzes your resume against the job description and generates optimized HTML with inline CSS
+3. **Optimize** — Your chosen AI provider (Claude or Groq) analyzes your resume against the job description and generates optimized HTML with inline CSS
 4. **Render** — Puppeteer converts the HTML to a clean, single-page A4 PDF
 5. **Refine** — Chat with the AI to make iterative adjustments until you're satisfied
 
@@ -143,7 +153,7 @@ Preferences are stored in `memory.json` and can be manually edited or deleted.
 | Technology | Purpose |
 |---|---|
 | **Node.js + Express 5** | Backend server and API |
-| **Claude AI (Sonnet 4)** | Resume content optimization |
+| **Claude AI (Sonnet 4)** or **Groq (Llama 3.3 70B)** | Resume content optimization (switchable via `AI_PROVIDER`) |
 | **Puppeteer** | HTML to PDF rendering |
 | **pdf-parse** | PDF text extraction |
 | **Multer** | File upload handling |
@@ -155,7 +165,9 @@ Preferences are stored in `memory.json` and can be manually edited or deleted.
 
 | Variable | Required | Description |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | ✅ | Your Anthropic API key |
+| `AI_PROVIDER` | ❌ | AI backend to use: `anthropic` (default) or `groq` |
+| `ANTHROPIC_API_KEY` | ✅* | Your Anthropic API key (*required when `AI_PROVIDER=anthropic`) |
+| `GROQ_API_KEY` | ✅* | Your Groq API key (*required when `AI_PROVIDER=groq`) |
 | `PORT` | ❌ | Server port (default: `3055`) |
 
 ---
